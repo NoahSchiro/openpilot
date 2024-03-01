@@ -1,6 +1,18 @@
 local cmp = require('cmp')
+local api = require('openpilot.api')
 
 local source = {}
+
+source._make_api_call = function(self, input, callback)
+
+	local data = {
+		model = 'mistral',
+		prompt = input,
+		stream = false
+	}
+
+	api:get(data, callback)
+end
 
 source.new = function()
 	return setmetatable({}, { __index = source})
@@ -38,21 +50,25 @@ source.complete = function(self, request, callback)
 	local buffer_content = source._get_last_k_lines()
 	local last_k_lines = source._get_last_k_lines(10)
 
-	local completions = {
-		{
-			word = buffer_content,
-			label = 'OpenPilot Code',
-			kind = cmp.lsp.CompletionItemKind.Snippet
-			
-		},
-		{
-			word = last_k_lines,
-			label = 'OpenPilot Docs',
-			kind = cmp.lsp.CompletionItemKind.Snippet
-		},
-	}
+	-- Handling the API call asynchronously
+	self:_make_api_call(buffer_content, function(response)
+		-- Construct completions after receiving the response
+		local completions = {
+			{
+				word = response, -- Assuming 'response' is the actual text you want to insert
+				label = 'OpenPilot Code',
+				kind = cmp.lsp.CompletionItemKind.Snippet
+			},
+			{
+				word = 'placeholder',
+				label = 'OpenPilot Docs',
+				kind = cmp.lsp.CompletionItemKind.Snippet
+			},
+		}
 
-	callback({ items = completions })
+		-- Call the callback with the completions after the response is processed
+		callback({ items = completions })
+	end)
 end
 
 source.get_metadata = function()
